@@ -1,0 +1,5 @@
+/pyvenv_310
+/.idea
+.env
+__pycache__
+/.DS_Store
