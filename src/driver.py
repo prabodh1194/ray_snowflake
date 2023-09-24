@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 
+import pyarrow
 import ray
+from pyarrow import Table
 
 import settings
 from data.snowflake.datasource import SnowflakeDatasource
@@ -16,12 +18,18 @@ rds = ray.data.read_datasource(
         connection_args=settings.SNOWFLAKE_CONNECTION_PROPS,
         query="SELECT * FROM LINEITEM"
     ),
-    parallelism=4
+    parallelism=3
 )
 
-ds = rds.add_column(
-    "L_QUANTITY_2", lambda _df: _df["L_QUANTITY"] * 2
-).to_pandas()
+
+def _comp(_ds: Table):
+    return _ds.append_column(
+        "L_QUANTITY_2",
+        pyarrow.compute.multiply(_ds.column("L_QUANTITY"), 2)
+    )
+
+
+ds = rds.map_batches(_comp, batch_format="pyarrow").to_pandas()
 
 ray_data_logger.info("pbd cols %s", ds.columns)
 ray_data_logger.info("pd size %s", ds.size)
