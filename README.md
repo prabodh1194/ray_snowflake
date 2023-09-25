@@ -6,7 +6,8 @@ This repo does a test drive of using snowflake as a source in ray. This has been
 
 You just need a valid snowflake account to test this out. I tested this code on a trial snowflake account and hence could get this to work with `ACCOUNTADMIN` creds.
 
-1. `cp .env.example .env`
+1. `make all`: create python 3.10 venv and install the deps.
+1. `cp .env.example .env`: setup the credentials environment.
 2. Open the `.env` file and setup the 3 creds.
 
 ### Run
