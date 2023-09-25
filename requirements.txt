@@ -4,3 +4,4 @@ python-dotenv==1.0.0
 pandas
 cryptography==41.0.4
 pyarrow
+tqdm
