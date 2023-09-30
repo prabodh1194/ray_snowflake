@@ -10,7 +10,7 @@ REQUIREMENTS_FILE = requirements.txt
 # for ubuntu arm64 machines apt install python3.10-venv
 ubuntu:
 ifeq ($(shell uname -m),aarch64)
-	sudo apt install python3.10-venv gcc python3-dev
+	sudo apt install python3-venv gcc python3-dev
 endif
 
 # Target for creating the virtual environment
