@@ -7,6 +7,12 @@ PYTHON = python3.10
 # Define the requirements file
 REQUIREMENTS_FILE = requirements.txt
 
+# for ubuntu arm64 machines apt install python3.10-venv
+ubuntu:
+ifeq ($(shell uname -m),aarch64)
+	sudo apt install python3.10-venv gcc python3-dev
+endif
+
 # Target for creating the virtual environment
 venv:
 	@echo "Creating Python virtual environment: $(VENV_NAME)"
@@ -23,7 +29,7 @@ clean:
 	@rm -rf $(VENV_NAME)
 
 # Default target
-all: install-requirements
+all: ubuntu install-requirements
 
 # PHONY targets (targets that don't represent files)
 .PHONY: venv install-requirements clean all
