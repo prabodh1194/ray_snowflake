@@ -28,7 +28,7 @@ def _comp(_ds: Table):
     )
 
 
-_ds = rds.map_batches(_comp, batch_format="pyarrow")
+_ds = rds.map_batches(_comp, batch_format="pyarrow", num_gpus=4)
 
 _ds.write_datasource(
     snowflake_datasource,
