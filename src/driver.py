@@ -17,7 +17,6 @@ snowflake_datasource = SnowflakeDatasource(connection_args=settings.SNOWFLAKE_CO
 
 rds = ray.data.read_datasource(
     snowflake_datasource,
-    parallelism=3
 )
 
 
@@ -28,7 +27,7 @@ def _comp(_ds: Table):
     )
 
 
-_ds = rds.map_batches(_comp, batch_format="pyarrow", num_gpus=4, batch_size=5)
+_ds = rds.map_batches(_comp, batch_format="pyarrow")
 
 _ds.write_datasource(
     snowflake_datasource,
