@@ -17,6 +17,7 @@ snowflake_datasource = SnowflakeDatasource(connection_args=settings.SNOWFLAKE_CO
 
 rds = ray.data.read_datasource(
     snowflake_datasource,
+    parallelism=16
 )
 
 
