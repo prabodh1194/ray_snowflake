@@ -29,10 +29,8 @@ def _comp(_ds: Table):
 
 _ds = rds.map_batches(_comp, batch_format="pyarrow")
 
-_ds.write_datasource(
-    snowflake_datasource,
-    database=f"PBD_{settings.SNOWFLAKE_CONNECTION_PROPS['database']}",
-    schema=settings.SNOWFLAKE_CONNECTION_PROPS["schema"],
-    table_name="LINEITEM",
-    auto_create_table=True,
-)
+
+_l_q_2 = _ds.select_columns(["L_QUANTITY_2"]).materialize()
+
+ray_data_logger.info("counting %s", _l_q_2.count())
+ray_data_logger.info("summing %s", _l_q_2.sum())
