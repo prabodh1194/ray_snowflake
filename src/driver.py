@@ -16,8 +16,7 @@ ray.init(logging_level=logging.DEBUG)
 snowflake_datasource = SnowflakeDatasource(connection_args=settings.SNOWFLAKE_CONNECTION_PROPS, query="SELECT * FROM LINEITEM")
 
 rds = ray.data.read_datasource(
-    snowflake_datasource,
-    parallelism=16
+    snowflake_datasource
 )
 
 
@@ -37,11 +36,3 @@ _ds.write_datasource(
     table_name="LINEITEM",
     auto_create_table=True,
 )
-
-ds = _ds.to_pandas()
-
-ray_data_logger.info("pbd cols %s", ds.columns)
-ray_data_logger.info("pd size %s", ds.size)
-ray_data_logger.info("pd size %s", len(ds))
-ray_data_logger.info("pd size %s", ds.shape)
-ray_data_logger.info("pd show %s", ds.head())

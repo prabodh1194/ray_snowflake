@@ -4,6 +4,7 @@ import logging
 from typing import Optional, Iterable
 
 import pyarrow as pa
+from functools import cached_property
 from ray.data import ReadTask
 from ray.data.block import BlockMetadata
 from ray.data.datasource import Reader
@@ -33,41 +34,51 @@ class _SnowflakeDatasourceReader(Reader):
         self._connection_args = connection_args
         self._query = query
 
-    def estimate_inmemory_data_size(self) -> Optional[int]:
-        return None
-
-    def get_read_tasks(self, parallelism: int) -> list[ReadTask]:
+    @cached_property
+    def _result_batches(self):
         with connect(**self._connection_args) as conn:
             with conn.cursor() as cur:
                 cur.execute(self._query)
                 batches = cur.get_result_batches()
 
-            read_tasks = []
+        return batches
 
-            for batch in batches:
-                metadata = BlockMetadata(
-                    num_rows=batch.rowcount,
-                    size_bytes=batch.uncompressed_size,
-                    schema=pa.schema(
-                        [
-                            pa.field(
-                                s.name,
-                                FIELD_TYPE_TO_PA_TYPE[
-                                    s.type_code
-                                ]
-                            )
-                            for s in batch.schema
-                        ]
-                    ),
-                    input_files=None,
-                    exec_stats=None
-                )
+    def estimate_inmemory_data_size(self) -> Optional[int]:
+        sz = None
 
-                _r_task = LazyReadTask(
-                    arrow_batch=batch,
-                    metadata=metadata
-                )
+        for batch in self._result_batches:
+            sz = (sz or 0) + (batch.uncompressed_size or 0)
 
-                read_tasks.append(_r_task)
+        ray_data_logger.info("Estimating in-memory data size %s", sz)
+        return sz
 
-            return read_tasks
+    def get_read_tasks(self, parallelism: int) -> list[ReadTask]:
+        read_tasks = []
+
+        for batch in self._result_batches:
+            metadata = BlockMetadata(
+                num_rows=batch.rowcount,
+                size_bytes=batch.uncompressed_size,
+                schema=pa.schema(
+                    [
+                        pa.field(
+                            s.name,
+                            FIELD_TYPE_TO_PA_TYPE[
+                                s.type_code
+                            ]
+                        )
+                        for s in batch.schema
+                    ]
+                ),
+                input_files=None,
+                exec_stats=None
+            )
+
+            _r_task = LazyReadTask(
+                arrow_batch=batch,
+                metadata=metadata
+            )
+
+            read_tasks.append(_r_task)
+
+        return read_tasks
