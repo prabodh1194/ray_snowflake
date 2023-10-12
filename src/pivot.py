@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 
 import ray
 from pyarrow import Table
@@ -15,7 +16,7 @@ ray.init(logging_level=logging.DEBUG, namespace="agg")
 
 snowflake_datasource = SnowflakeDatasource(
     connection_args=settings.SNOWFLAKE_CONNECTION_PROPS,
-    query="SELECT * exclude (timestamp) FROM TEST.PUBLIC.EVENTS_DATA limit 10000"
+    query="SELECT * exclude (timestamp) FROM TEST.PUBLIC.EVENTS_DATA limit 100000"
 )
 
 rds = ray.data.read_datasource(
@@ -31,7 +32,7 @@ class TotalEvents:
         self.value = set()
 
     def add(self, event_name: str) -> set[str]:
-        self.value.add(event_name.as_py())
+        self.value.add(event_name)
         return self.value
 
     def get_total_events(self) -> set[str]:
@@ -41,30 +42,33 @@ class TotalEvents:
 @ray.remote
 class Counter:
     def __init__(self):
-        self.value = {}
+        self.value = defaultdict(lambda: defaultdict(int))
 
-    def increment(self, user_id: str) -> dict[str, int]:
-        self.value[user_id] = self.value.get(user_id, 0) + 1
+    def increment(self, *, event_name: str, user_id: str, by: int) -> dict[str, dict[str, int]]:
+        self.value[user_id][event_name] += by
         return self.value
 
-    def get_counter(self) -> dict[str, int]:
-        return self.value
+    def get_counter(self) -> dict[str, dict[str, int]]:
+        return dict(self.value)
 
 
 tot_events = TotalEvents.options(name="evt", get_if_exists=True).remote()
 
 
 def _count(_ds: Table):
-    for i in range(_ds.num_rows):
-        event_name = _ds[0][i]
-        user_id = _ds[-1][i]
+    _gs = _ds.group_by(["EVENT_NAME", "USER_ID"]).aggregate([("EVENT_NAME", "count")])
 
-        k = event_name.as_py()
+    for i in range(_gs.num_rows):
+        event_name = _gs[1][i]
+        user_id = _gs[2][i]
+        inc = _gs[0][i]
 
-        ctr = Counter.options(name=k, get_if_exists=True, lifetime="detached").remote()
-        ctr.increment.remote(user_id=user_id.as_py())
+        _k = event_name.as_py()
 
-        tot_events.add.remote(event_name=event_name)
+        ctr = Counter.options(name=_k[0], get_if_exists=True, lifetime="detached").remote()
+        ctr.increment.remote(event_name=_k, user_id=user_id.as_py(), by=inc.as_py())
+
+        tot_events.add.remote(event_name=_k)
 
     return _ds
 
@@ -74,6 +78,5 @@ rds.map_batches(_count, batch_format="pyarrow").materialize()
 ray_data_logger.info(ray.get(tot_events.get_total_events.remote()))
 
 for k in ray.get(tot_events.get_total_events.remote()):
-    _act = ray.get_actor(k, "agg")
+    _act = ray.get_actor(k[0], "agg")
     ray_data_logger.info(ray.get(_act.get_counter.remote()))
-    ray.kill(_act)
